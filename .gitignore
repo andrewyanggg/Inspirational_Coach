@@ -1,0 +1,2 @@
+.env
+llm/llama-finetuned/model.safetensors
