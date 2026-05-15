@@ -1,2 +1,3 @@
 .env
 llm/llama-finetuned/model.safetensors
+.DS_Store
