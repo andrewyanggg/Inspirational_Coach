@@ -157,7 +157,7 @@ const generateMotivation = async (goal: Goal) => {
 
   try {
     // API call
-    const response = await axios.post("http://localhost:8080/goal", {
+    const response = await axios.post("http://localhost:8000/goal", {
       prompt: `You are a personal inspirational coach. Generate ONE single, cohesive inspirational message (2-3 sentences) that:
 
         1. Directly addresses the goal titled "${goal.title}".
