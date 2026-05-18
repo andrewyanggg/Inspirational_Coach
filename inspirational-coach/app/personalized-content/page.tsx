@@ -168,7 +168,7 @@ export default function PersonalizedContent() {
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:8080/generate", {
+      const response = await axios.post("http://localhost:8000/generate", {
         prompt: `You are a personal inspirational coach. Generate ONE single, cohesive inspirational message (3-4 sentences) that:
 
           1. Incorporates elements from ${culture} culture
