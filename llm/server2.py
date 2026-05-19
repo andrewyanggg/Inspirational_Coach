@@ -5,22 +5,21 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import re
 
-# Load fine-tuned model
 MODEL_PATH = "./llama-finetuned"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_PATH, 
-    torch_dtype=torch.float16, 
+    MODEL_PATH,
+    torch_dtype=torch.float16,
     device_map="auto"
 )
 
-# Define request body
+device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+
 class RequestModel(BaseModel):
     prompt: str
-    max_tokens: int = 150
+    max_tokens: int = 100
 
-# Initialize FastAPI
 app = FastAPI()
 
 app.add_middleware(
@@ -31,36 +30,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def clean_generated_text(text: str) -> str:
-    if isinstance(text, str):
-        # Find all quotation marks in the text
-        quote_positions = [match.start() for match in re.finditer(r'["""]', text)]
-        
-        # Check if there are at least 5 quotation marks
-        if len(quote_positions) >= 5:
-            # Get the position after the fifth quotation mark
-            fifth_quote_pos = quote_positions[4] + 1  # +1 to exclude the quote itself
-            return text[fifth_quote_pos:].strip()
-        elif len(quote_positions) > 0:
-            # Fallback: if fewer than 5 quotes, use the last one
-            last_quote_pos = quote_positions[-1] + 1
-            return text[last_quote_pos:].strip()
-        return text  # Return original if no quotation marks found
-    return text  # Return unchanged if not a string
+def generate_response(prompt: str, max_tokens: int) -> str:
+    """Generate a response with proper parameters and clean output."""
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    prompt_length = inputs.input_ids.shape[1]
+
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=max_tokens,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=1.3,
+        pad_token_id=tokenizer.eos_token_id
+    )
+
+    new_tokens = outputs[0][prompt_length:]
+    response = tokenizer.decode(new_tokens, skip_special_tokens=True)
+    return response.strip()
 
 @app.post("/generate")
 async def generate_text(request: RequestModel):
-    print(f"Received prompt: {request.prompt}")  # Debugging line
+    print(f"Received prompt: {request.prompt[:100]}...")
+    response = generate_response(request.prompt, request.max_tokens)
+    return {"response": response}
 
-    inputs = tokenizer(request.prompt, return_tensors="pt").to("cuda" if torch.cuda.is_available() else "cpu")
-    outputs = model.generate(**inputs, max_new_tokens=request.max_tokens)
-
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    # Clean the generated response
-    cleaned_text = clean_generated_text(generated_text)
-
-    return {"response": cleaned_text}
+@app.post("/goal")
+async def generate_goal_text(request: RequestModel):
+    print(f"Received goal prompt: {request.prompt[:100]}...")
+    response = generate_response(request.prompt, request.max_tokens)
+    return {"response": response}
 
 if __name__ == "__main__":
     import uvicorn
